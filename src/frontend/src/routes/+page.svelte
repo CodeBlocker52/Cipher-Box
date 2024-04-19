@@ -1,88 +1,65 @@
 <script lang="ts">
-	import { getActor } from '$lib/actor';
-	import { AnonymousIdentity } from '@dfinity/agent';
-	import { createActor } from '../../../declarations/backend';
+	import { Segment, SegmentButton, IconAdd, IconLockClock } from '@dfinity/gix-components';
+	import AddTotp from '$lib/components/AddTotp/AddTotp.svelte';
+	import { onMount } from 'svelte';
+	import { totpStore } from '$lib/stores/totop.store';
 
-	let input = '';
-	let disabled = false;
-	let greeting = '';
+	import CardTotp from '$lib/components/CardTotp/CardTotp.svelte';
+	import ProgressBarTotp from '$lib/components/ProgressBarTotp/ProgressBarTotp.svelte';
+	import { authStore } from '$lib/auth.store';
 
-	const handleOnSubmit = async () => {
-		disabled = true;
+	let firstSegmentId = Symbol();
+	let secondSegmentId = Symbol();
+	$: selectedSegmentId = secondSegmentId;
 
-		try {
-			// Canister IDs are automatically expanded to .env config - see vite.config.ts
-			const canisterId = import.meta.env.VITE_BACKEND_CANISTER_ID;
-			console.log(canisterId);
-
-			// We pass the host instead of using a proxy to support NodeJS >= v17 (ViteJS issue: https://github.com/vitejs/vite/issues/4794)
-			const host = import.meta.env.VITE_HOST;
-			console.log(host);
-
-			// const actor = await getActor(new AnonymousIdentity());
-
-			// Create an actor to interact with the IC for a particular canister ID
-			const actor = createActor(canisterId, { agentOptions: { host } });
-
-			// Call the IC
-			greeting = await actor.greet(input);
-		} catch (err: unknown) {
-			console.error(err);
+	async function waitForFetch() {
+		if ($totpStore.encryptedTotps.length === 0 && $authStore.isAuthenticated) {
+			await totpStore.fetchTOTP();
+		} else {
 		}
+	}
 
-		disabled = false;
-	};
+	onMount(() => {
+		setTimeout(() => {
+			selectedSegmentId = firstSegmentId;
+		}, 20);
+	});
 </script>
 
-<main>
-	<img src="logo2.svg" alt="DFINITY logo" />
-	<br />
-	<br />
+<!-- {#await waitForFetch() then _} -->
+<div class="segment">
+	<Segment bind:selectedSegmentId>
+		<SegmentButton segmentId={firstSegmentId}
+			><div class="SegmentButtonChild"><IconLockClock /></div>
+		</SegmentButton>
+		<SegmentButton segmentId={secondSegmentId}
+			><div class="SegmentButtonChild"><IconAdd /></div>
+		</SegmentButton>
+	</Segment>
+</div>
 
-	<form on:submit={handleOnSubmit}>
-		<label for="name">Enter your name: &nbsp;</label>
-		<input id="name" alt="Name" type="text" bind:value={input} {disabled} />
-		<button type="submit">Click Me!</button>
-	</form>
+{#if selectedSegmentId === firstSegmentId}
+	<ProgressBarTotp />
+	{#each $totpStore.decryptedTotps as totps}
+		<CardTotp decryptedTotp={totps} />
+	{/each}
+{:else if selectedSegmentId === secondSegmentId}
+	<AddTotp />
+{/if}
 
-	<section id="greeting">
-		{greeting}
-	</section>
-</main>
+<!-- {/await} -->
 
-<style lang="scss">
-	img {
-		max-width: 50vw;
-		max-height: 25vw;
-		display: block;
-		margin: auto;
+<style lang="scss" global>
+	.SegmentButtonChild {
+		padding-left: 10px;
 	}
-
-	form {
+	.segment {
 		display: flex;
 		justify-content: center;
-		gap: 0.5em;
-		flex-flow: row wrap;
-		max-width: 40vw;
-		margin: auto;
-		align-items: baseline;
-		font-family: sans-serif;
-		font-size: 1.5rem;
 	}
-
-	button[type='submit'] {
-		padding: 5px 20px;
-		margin: 10px auto;
-		float: right;
-	}
-
-	#greeting {
-		margin: 10px auto;
-		padding: 10px 60px;
-		border: 1px solid #222;
-	}
-
-	#greeting:empty {
-		display: none;
+	.progressCenter {
+		display: flex;
+		justify-content: center;
+		align-items: center;
 	}
 </style>
